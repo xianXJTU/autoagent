@@ -1,0 +1,25 @@
+# 本地环境与密钥
+.venv/
+.env
+.env.local
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 生成物与运行数据
+workspace/
+data/
+runs/
+
+# 前端
+node_modules/
+dist/
+
+# 系统
+Thumbs.db
+.DS_Store
