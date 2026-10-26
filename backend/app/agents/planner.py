@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from typing import Callable
+
+from ..llm.structured import chat_structured_stream
 from .base import BaseAgent
 from .prompts import PLANNER_SYSTEM
 from .schemas import AlignmentQuestions, PlanDraft
@@ -10,7 +13,11 @@ class PlannerAgent(BaseAgent):
     system_prompt = PLANNER_SYSTEM
 
     async def ask_questions(
-        self, history_text: str, round_no: int, max_rounds: int = 5
+        self,
+        history_text: str,
+        round_no: int,
+        max_rounds: int = 5,
+        on_delta: Callable[[str, str], None] | None = None,
     ) -> AlignmentQuestions:
         content = (
             f"这是第 {round_no} 轮提问，最多 {max_rounds} 轮。\n"
@@ -21,25 +28,55 @@ class PlannerAgent(BaseAgent):
             "3. 每个问题都用一句话说明为什么推荐这样做，写在 reason 字段；\n"
             "4. 如果某个信息可以自己查或可以合理默认，就不要拿来问用户。"
         )
-        result, _ = await self._structured(
-            AlignmentQuestions, content, purpose="需求对齐"
+        if on_delta is None:
+            result, _ = await self._structured(
+                AlignmentQuestions, content, purpose="需求对齐"
+            )
+            return result
+        result, _ = await chat_structured_stream(
+            self.context.model_service,
+            AlignmentQuestions,
+            self._messages(content),
+            on_delta,
+            run_id=self.context.run_id,
+            agent_id=self.role,
+            purpose="需求对齐",
         )
         return result
 
-    async def draft_readme(self, confirmed_summary: str) -> str:
+    async def draft_readme(
+        self,
+        confirmed_summary: str,
+        on_delta: Callable[[str, str], None] | None = None,
+    ) -> str:
         content = (
             "根据以下已确认信息，生成一份中文需求文档。"
             "必须包含：目标用户、核心流程、功能清单、页面清单、数据实体、"
             "可检验的验收标准、明确不做的事。只输出文档正文。\n"
             f"{confirmed_summary}"
         )
-        result = await self.context.model_service.chat(
+        if on_delta is None:
+            result = await self.context.model_service.chat(
+                self._messages(content),
+                run_id=self.context.run_id,
+                agent_id=self.role,
+                purpose="生成需求文档",
+            )
+            return result.content.strip()
+
+        parts: list[str] = []
+        async for delta in self.context.model_service.chat_stream(
             self._messages(content),
             run_id=self.context.run_id,
             agent_id=self.role,
             purpose="生成需求文档",
-        )
-        return result.content.strip()
+        ):
+            if delta.reasoning:
+                on_delta("reasoning", delta.reasoning)
+            if delta.content:
+                parts.append(delta.content)
+                on_delta("content", delta.content)
+        return "".join(parts).strip()
 
     async def draft_plan(self, readme: str) -> PlanDraft:
         content = (

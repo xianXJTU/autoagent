@@ -110,6 +110,86 @@ export const sendMessage = (id: string, text: string) =>
     body: JSON.stringify({ text })
   });
 
+export interface StreamHandlers {
+  onThinking?: (text: string) => void;
+  onContent?: (text: string) => void;
+  onResult?: (data: unknown) => void;
+  onError?: (message: string) => void;
+}
+
+async function streamRequest(
+  url: string,
+  body: unknown,
+  handlers: StreamHandlers
+): Promise<void> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let message = text || response.statusText || `HTTP ${response.status}`;
+    try {
+      const data = JSON.parse(text) as { detail?: unknown };
+      if (typeof data.detail === "string" && data.detail) message = data.detail;
+    } catch {
+      // 保留原始文本
+    }
+    handlers.onError?.(message);
+    throw new Error(message);
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("浏览器不支持流式响应");
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let errorMessage = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary >= 0) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      let event = "message";
+      let dataText = "";
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event: ")) event = line.slice(7).trim();
+        else if (line.startsWith("data: ")) dataText += line.slice(6);
+      }
+      boundary = buffer.indexOf("\n\n");
+      if (!dataText) continue;
+      let data: unknown;
+      try {
+        data = JSON.parse(dataText);
+      } catch {
+        continue;
+      }
+      if (event === "thinking") {
+        handlers.onThinking?.((data as { text?: string }).text ?? "");
+      } else if (event === "content") {
+        handlers.onContent?.((data as { text?: string }).text ?? "");
+      } else if (event === "result") {
+        handlers.onResult?.(data);
+      } else if (event === "error") {
+        errorMessage = (data as { detail?: string }).detail ?? "模型调用失败";
+        handlers.onError?.(errorMessage);
+      }
+    }
+  }
+  if (errorMessage) throw new Error(errorMessage);
+}
+
+export const streamMessage = (
+  projectId: string,
+  text: string,
+  handlers: StreamHandlers
+) => streamRequest(`/api/projects/${projectId}/messages/stream`, { text }, handlers);
+
+export const streamAlignment = (projectId: string, handlers: StreamHandlers) =>
+  streamRequest(`/api/projects/${projectId}/align/stream`, {}, handlers);
+
 export const approveDocument = (projectId: string, documentId: string) =>
   request<Record<string, unknown>>(
     `/api/projects/${projectId}/documents/${documentId}/approve`,

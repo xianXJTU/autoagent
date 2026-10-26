@@ -35,6 +35,50 @@ def extract_json(text: str) -> dict[str, Any]:
     return value
 
 
+async def chat_structured_stream(
+    service: ModelService,
+    schema: type[SchemaT],
+    messages: list[dict[str, Any]],
+    on_delta,
+    run_id: str | None = None,
+    agent_id: str | None = None,
+    purpose: str = "",
+    max_repair: int = 2,
+) -> tuple[SchemaT, Any]:
+    conversation = ensure_json_hint(list(messages))
+    last_error: Exception | None = None
+    for _ in range(max_repair + 1):
+        parts: list[str] = []
+        final = None
+        async for delta in service.chat_stream(
+            conversation,
+            run_id=run_id,
+            agent_id=agent_id,
+            purpose=purpose,
+            response_format={"type": "json_object"},
+        ):
+            if delta.reasoning:
+                on_delta("reasoning", delta.reasoning)
+            if delta.content:
+                parts.append(delta.content)
+                on_delta("content", delta.content)
+            if delta.done:
+                final = delta
+        text = "".join(parts)
+        try:
+            return schema.model_validate(extract_json(text)), final
+        except (ValueError, ValidationError) as exc:
+            last_error = exc
+            conversation = conversation + [
+                {"role": "assistant", "content": text},
+                {
+                    "role": "user",
+                    "content": f"上一次输出无法解析：{exc}。请只输出符合要求的 JSON 对象。",
+                },
+            ]
+    raise ValueError(f"结构化输出修复失败：{last_error}")
+
+
 async def chat_structured(
     service: ModelService,
     schema: type[SchemaT],

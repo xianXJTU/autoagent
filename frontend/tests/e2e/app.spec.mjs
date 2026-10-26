@@ -65,9 +65,15 @@ test("问题以独立卡片呈现，可逐题修改", async ({ page }) => {
   await page.route("**/api/projects/demo", (route) =>
     route.fulfill({ json: detail })
   );
-  await page.route("**/api/projects/demo/messages", async (route) => {
+  await page.route("**/api/projects/demo/messages/stream", async (route) => {
     posted = route.request().postDataJSON();
-    await route.fulfill({ json: { action: "questions" } });
+    await route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "text/event-stream" },
+      body:
+        'event: thinking\ndata: {"text":"先想一想"}\n\n' +
+        'event: result\ndata: {"action":"questions"}\n\n'
+    });
   });
 
   await page.goto("/");

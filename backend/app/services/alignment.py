@@ -5,7 +5,7 @@ from __future__ import annotations
 import difflib
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -61,9 +61,16 @@ class AlignmentService:
         self.workspace_root = workspace_root
         self.max_rounds = max_rounds
 
-    async def start(self, project_id: str, run_id: str) -> AlignmentQuestions:
+    async def start(
+        self,
+        project_id: str,
+        run_id: str,
+        on_delta: Callable[[str, str], None] | None = None,
+    ) -> AlignmentQuestions:
         history = self._history_text(project_id)
-        questions = await self.planner.ask_questions(history, 1, self.max_rounds)
+        questions = await self.planner.ask_questions(
+            history, 1, self.max_rounds, on_delta=on_delta
+        )
         content = format_questions(questions, 1)
         self._add_message(
             project_id, run_id, "planner", content, agent_id="planner",
@@ -77,12 +84,18 @@ class AlignmentService:
         )
         return questions
 
-    async def answer(self, project_id: str, run_id: str, text: str) -> dict[str, Any]:
+    async def answer(
+        self,
+        project_id: str,
+        run_id: str,
+        text: str,
+        on_delta: Callable[[str, str], None] | None = None,
+    ) -> dict[str, Any]:
         self._add_message(project_id, run_id, "user", text)
         round_no = self._round(run_id)
         history = self._history_text(project_id)
         if text.strip() in STOP_PHRASES or round_no >= self.max_rounds:
-            readme = await self.planner.draft_readme(history)
+            readme = await self.planner.draft_readme(history, on_delta=on_delta)
             document = self._save_document(project_id, run_id, "readme", readme)
             self._set_status(project_id, run_id, "待审阅")
             await self.events.emit(
@@ -98,7 +111,7 @@ class AlignmentService:
 
         next_round = round_no + 1
         questions = await self.planner.ask_questions(
-            history, next_round, self.max_rounds
+            history, next_round, self.max_rounds, on_delta=on_delta
         )
         content = format_questions(questions, next_round)
         self._add_message(

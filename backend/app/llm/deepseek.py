@@ -7,7 +7,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from .base import ChatResult, ToolCallOut, ensure_json_hint
+from .base import ChatResult, StreamDelta, ToolCallOut, ensure_json_hint
 
 
 def _is_retryable(exc: Exception) -> bool:
@@ -72,6 +72,74 @@ class DeepSeekProvider:
                     raise
                 await asyncio.sleep(min(2**attempt, 8))
         raise RuntimeError(f"模型调用失败：{last_error}")
+
+    async def chat_stream(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        response_format: dict[str, Any] | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+    ):
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+        if response_format:
+            payload["response_format"] = response_format
+            if response_format.get("type") == "json_object":
+                payload["messages"] = ensure_json_hint(messages)
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+
+        last_error: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            yielded = False
+            prompt_tokens = 0
+            completion_tokens = 0
+            try:
+                stream = await self.client.chat.completions.create(**payload)
+                async for chunk in stream:
+                    usage = getattr(chunk, "usage", None)
+                    if usage is not None:
+                        prompt_tokens = getattr(usage, "prompt_tokens", 0) or prompt_tokens
+                        completion_tokens = (
+                            getattr(usage, "completion_tokens", 0) or completion_tokens
+                        )
+                    choices = getattr(chunk, "choices", []) or []
+                    if not choices:
+                        continue
+                    delta = choices[0].delta
+                    reasoning = getattr(delta, "reasoning_content", None)
+                    if reasoning is None and hasattr(delta, "model_extra"):
+                        reasoning = (delta.model_extra or {}).get("reasoning_content")
+                    content = getattr(delta, "content", None)
+                    if reasoning or content:
+                        yielded = True
+                        yield StreamDelta(
+                            reasoning=reasoning or "",
+                            content=content or "",
+                            model=self.model,
+                        )
+                yield StreamDelta(
+                    done=True,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    model=self.model,
+                )
+                return
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                if yielded or attempt >= self.max_retries or not _is_retryable(exc):
+                    raise
+                await asyncio.sleep(min(2**attempt, 8))
+        raise RuntimeError(f"流式模型调用失败：{last_error}")
 
     def _parse(self, response: Any) -> ChatResult:
         choice = response.choices[0]

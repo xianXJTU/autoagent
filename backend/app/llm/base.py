@@ -18,11 +18,21 @@ class ToolCallOut(BaseModel):
 
 class ChatResult(BaseModel):
     content: str = ""
+    reasoning: str = ""
     tool_calls: list[ToolCallOut] = Field(default_factory=list)
     prompt_tokens: int = 0
     completion_tokens: int = 0
     model: str = ""
     raw: dict[str, Any] | None = None
+
+
+class StreamDelta(BaseModel):
+    reasoning: str = ""
+    content: str = ""
+    done: bool = False
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    model: str = ""
 
 
 class EmbeddingResult(BaseModel):

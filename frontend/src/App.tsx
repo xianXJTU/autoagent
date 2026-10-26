@@ -23,6 +23,12 @@ export default function App() {
   const [evaluation, setEvaluation] = useState<api.Evaluation | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [thinking, setThinking] = useState({
+    reasoning: "",
+    content: "",
+    active: false
+  });
+  const messagesRef = useRef<HTMLDivElement | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteTraces, setDeleteTraces] = useState(false);
   const [deleteExport, setDeleteExport] = useState(false);
@@ -98,6 +104,11 @@ export default function App() {
     setAnswers(next);
   }, [lastMessageId]);
 
+  useEffect(() => {
+    const element = messagesRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [detail?.messages.length, thinking.reasoning, thinking.content]);
+
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
     setError("");
@@ -110,6 +121,22 @@ export default function App() {
     }
   };
 
+  const streamHandlers = (
+    onResult?: (data: unknown) => void
+  ): api.StreamHandlers => ({
+    onThinking: (chunk) =>
+      setThinking((current) => ({
+        ...current,
+        reasoning: current.reasoning + chunk
+      })),
+    onContent: (chunk) =>
+      setThinking((current) => ({
+        ...current,
+        content: current.content + chunk
+      })),
+    onResult
+  });
+
   const createProject = () =>
     run(async () => {
       if (!name.trim()) {
@@ -121,22 +148,43 @@ export default function App() {
       setRequirement("");
       await refreshProjects();
       setSelected(created.project_id);
-      await api.startAlignment(created.project_id);
+      await refreshDetail(created.project_id);
+      setThinking({ reasoning: "", content: "", active: true });
+      try {
+        await api.streamAlignment(created.project_id, streamHandlers());
+      } finally {
+        setThinking({ reasoning: "", content: "", active: false });
+      }
       await refreshDetail(created.project_id);
     });
 
   const startAlignment = () =>
     run(async () => {
       if (!selected) return;
-      await api.startAlignment(selected);
+      setThinking({ reasoning: "", content: "", active: true });
+      try {
+        await api.streamAlignment(selected, streamHandlers());
+      } finally {
+        setThinking({ reasoning: "", content: "", active: false });
+      }
       await refreshDetail(selected);
     });
 
   const send = () =>
     run(async () => {
       if (!selected || !text.trim()) return;
-      const result = await api.sendMessage(selected, text.trim());
-      if ((result as { action?: string }).action === "review") setTab("doc");
+      setThinking({ reasoning: "", content: "", active: true });
+      try {
+        await api.streamMessage(
+          selected,
+          text.trim(),
+          streamHandlers((data) => {
+            if ((data as { action?: string }).action === "review") setTab("doc");
+          })
+        );
+      } finally {
+        setThinking({ reasoning: "", content: "", active: false });
+      }
       setText("");
       await refreshDetail(selected);
     });
@@ -157,8 +205,18 @@ export default function App() {
         entries
           .map((entry, index) => `${index + 1}. ${entry.question}\n回答：${entry.answer}`)
           .join("\n\n");
-      const result = await api.sendMessage(selected, body);
-      if ((result as { action?: string }).action === "review") setTab("doc");
+      setThinking({ reasoning: "", content: "", active: true });
+      try {
+        await api.streamMessage(
+          selected,
+          body,
+          streamHandlers((data) => {
+            if ((data as { action?: string }).action === "review") setTab("doc");
+          })
+        );
+      } finally {
+        setThinking({ reasoning: "", content: "", active: false });
+      }
       await refreshDetail(selected);
     });
 
@@ -373,7 +431,7 @@ export default function App() {
 
             <div className="workbench">
               <section className="conversation">
-                <div className="messages">
+                <div className="messages" ref={messagesRef}>
                   {detail.messages.map((message, index) => (
                     <div
                       key={message.id}
@@ -423,6 +481,17 @@ export default function App() {
                     <button className="btn primary inline" disabled={busy} onClick={startAlignment}>
                       开始需求对齐
                     </button>
+                  )}
+                  {thinking.active && (
+                    <div className="thinking-block">
+                      <div className="thinking-head">
+                        <span className="thinking-dot" />
+                        模型正在思考…
+                      </div>
+                      <pre className="thinking-text">
+                        {thinking.reasoning || thinking.content || "正在准备…"}
+                      </pre>
+                    </div>
                   )}
                 </div>
 

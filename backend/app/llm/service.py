@@ -88,6 +88,41 @@ class ModelService:
         )
         return result
 
+    async def chat_stream(
+        self,
+        messages: list[dict[str, Any]],
+        run_id: str | None = None,
+        agent_id: str | None = None,
+        purpose: str = "",
+        **kwargs: Any,
+    ):
+        started = time.perf_counter()
+        model = self.chat_provider.model
+        prompt_tokens = 0
+        completion_tokens = 0
+        status = "ok"
+        try:
+            async for delta in self.chat_provider.chat_stream(messages, **kwargs):
+                if delta.done:
+                    prompt_tokens = delta.prompt_tokens or prompt_tokens
+                    completion_tokens = delta.completion_tokens or completion_tokens
+                    model = delta.model or model
+                yield delta
+        except Exception:
+            status = "error"
+            raise
+        finally:
+            self._record(
+                run_id,
+                agent_id,
+                purpose,
+                model,
+                prompt_tokens,
+                completion_tokens,
+                int((time.perf_counter() - started) * 1000),
+                status,
+            )
+
     async def embed(
         self,
         texts: list[str],

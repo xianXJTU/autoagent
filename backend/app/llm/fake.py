@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import math
 import re
 from typing import Any
 
-from .base import ChatResult, EmbeddingResult
+from .base import ChatResult, EmbeddingResult, StreamDelta
 
 _TOKEN = re.compile(r"[A-Za-z0-9_]+|[一-鿿]+")
 
@@ -59,6 +60,41 @@ class FakeLLMProvider:
         if isinstance(item, ChatResult):
             return item
         return ChatResult(**item)
+
+    async def chat_stream(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        response_format: dict[str, Any] | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+    ):
+        self.calls.append(
+            {
+                "messages": messages,
+                "tools": tools,
+                "response_format": response_format,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": True,
+            }
+        )
+        if not self.responses:
+            raise RuntimeError("测试替身没有剩余响应")
+        item = self.responses.pop(0)
+        result = item if isinstance(item, ChatResult) else ChatResult(**item)
+        for start in range(0, len(result.reasoning), 8):
+            yield StreamDelta(reasoning=result.reasoning[start : start + 8])
+            await asyncio.sleep(0)
+        for start in range(0, len(result.content), 8):
+            yield StreamDelta(content=result.content[start : start + 8])
+            await asyncio.sleep(0)
+        yield StreamDelta(
+            done=True,
+            prompt_tokens=result.prompt_tokens,
+            completion_tokens=result.completion_tokens,
+            model=result.model or self.model,
+        )
 
     async def embed(self, texts: list[str]) -> EmbeddingResult:
         self.embedding_calls.append(list(texts))
