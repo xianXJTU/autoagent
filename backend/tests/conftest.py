@@ -58,3 +58,10 @@ def memory_session_factory(db_engine):
     from backend.app.db.session import build_session_factory
 
     return build_session_factory(db_engine)
+
+
+@pytest.fixture
+def api_app(test_settings: Settings, db_engine):
+    from backend.app.main import create_app
+
+    return create_app(test_settings)

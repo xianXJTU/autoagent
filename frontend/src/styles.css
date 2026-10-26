@@ -1,0 +1,400 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f1115;
+  --panel: #161a21;
+  --panel-2: #1c222b;
+  --line: #2a3240;
+  --text: #e6e9ef;
+  --muted: #8b95a7;
+  --accent: #4f8cff;
+  --ok: #34c38f;
+  --bad: #f2637b;
+  --warn: #e0a83b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body,
+html,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+button.danger {
+  background: var(--bad);
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: 100%;
+}
+
+.sidebar {
+  border-right: 1px solid var(--line);
+  background: #11151b;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+
+.new-project {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.new-project input,
+.new-project textarea,
+.composer textarea,
+.doc-panel textarea {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.new-project textarea {
+  min-height: 68px;
+}
+
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.project-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  text-align: left;
+  padding: 10px;
+}
+
+.project-item.active,
+.project-item:hover {
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+.project-item small {
+  color: var(--muted);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.welcome {
+  margin: auto;
+  max-width: 560px;
+  padding: 40px;
+  text-align: center;
+}
+
+.welcome h1 {
+  font-size: 30px;
+  margin-bottom: 12px;
+}
+
+.welcome p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.status {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+
+.status.ok {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.status.bad {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+.status.warn {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.status.run {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.actions a {
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 24px 0;
+}
+
+.tabs button {
+  background: transparent;
+  border-radius: 8px 8px 0 0;
+  color: var(--muted);
+}
+
+.tabs button.active {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.panel {
+  margin: 16px 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  overflow: auto;
+  flex: 1;
+}
+
+.error {
+  margin: 12px 24px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--bad);
+  color: var(--bad);
+  border-radius: 8px;
+  white-space: pre-wrap;
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message {
+  max-width: 78%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.message.user {
+  align-self: flex-end;
+  background: #23324a;
+}
+
+.message .meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.message .content {
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.composer textarea {
+  flex: 1;
+  min-height: 64px;
+}
+
+.doc-panel pre,
+.diff {
+  background: #0c1016;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  white-space: pre-wrap;
+  line-height: 1.65;
+  max-height: 46vh;
+  overflow: auto;
+}
+
+.doc-head {
+  display: flex;
+  gap: 12px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.doc-panel textarea {
+  width: 100%;
+  min-height: 70px;
+  margin-bottom: 10px;
+}
+
+.file-list,
+.module-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.file-list li,
+.module-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.file-list small,
+.module-list small {
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.metric {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metric small {
+  color: var(--muted);
+}
+
+.score-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.score-table th,
+.score-table td {
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.score-table th {
+  color: var(--muted);
+  font-weight: 500;
+}

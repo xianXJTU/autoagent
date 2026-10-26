@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
+from .api.routes.projects import router as projects_router
+from .api.routes.runs import router as runs_router
 from .config import Settings, get_settings
-from .db.session import build_engine, build_session_factory
-from .events.bus import EventBus
 from .events.router import router as events_router
 from .logging_config import configure_logging
+from .services.container import ServiceContainer
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -19,13 +23,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     current.ensure_dirs()
     configure_logging()
 
-    engine = build_engine(current.database_url)
-    session_factory = build_session_factory(engine)
+    container = ServiceContainer(current)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         yield
-        engine.dispose()
+        container.close()
 
     app = FastAPI(
         title=current.app_name,
@@ -33,10 +36,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = current
-    app.state.engine = engine
-    app.state.session_factory = session_factory
-    app.state.event_bus = EventBus()
+    app.state.services = container
+    app.state.engine = container.engine
+    app.state.session_factory = container.session_factory
+    app.state.event_bus = container.events.bus
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.include_router(events_router)
+    app.include_router(projects_router)
+    app.include_router(runs_router)
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:
@@ -45,6 +59,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "app": current.app_name,
             "version": current.app_version,
         }
+
+    frontend = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+    if frontend.exists():
+        app.mount("/", StaticFiles(directory=str(frontend), html=True), name="frontend")
 
     return app
 

@@ -87,6 +87,11 @@ class RunState(TypedDict, total=False):
     paused_from: str
     evaluated: bool
     summary: str
+    readme: str
+    plan_json: str
+    plan_document_id: str
+    test_files: list[str]
+    package_path: str
 
 
 def initial_state(project_id: str, run_id: str) -> RunState:
@@ -105,6 +110,11 @@ def initial_state(project_id: str, run_id: str) -> RunState:
         "paused_from": "",
         "evaluated": False,
         "summary": "",
+        "readme": "",
+        "plan_json": "",
+        "plan_document_id": "",
+        "test_files": [],
+        "package_path": "",
     }
 
 
