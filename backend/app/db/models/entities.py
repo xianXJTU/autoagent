@@ -202,6 +202,7 @@ class Skill(TimestampMixin, Base):
     version: Mapped[str] = mapped_column(String(32), nullable=False, default="1.0.0")
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     language: Mapped[str] = mapped_column(String(32), nullable=False, default="python")
+    category: Mapped[str] = mapped_column(String(32), nullable=False, default="domain")
     tags_json: Mapped[list[str]] = mapped_column(JSON, default=list)
     decision_points_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     applies_when: Mapped[str] = mapped_column(Text, nullable=False, default="")

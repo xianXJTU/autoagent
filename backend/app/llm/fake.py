@@ -3,9 +3,24 @@
 from __future__ import annotations
 
 import hashlib
+import math
+import re
 from typing import Any
 
 from .base import ChatResult, EmbeddingResult
+
+_TOKEN = re.compile(r"[A-Za-z0-9_]+|[一-鿿]+")
+
+
+def _lexical_tokens(text: str) -> list[str]:
+    tokens: list[str] = []
+    for chunk in _TOKEN.findall(text.lower()):
+        if re.fullmatch(r"[一-鿿]+", chunk):
+            tokens.extend(chunk)
+            tokens.extend(chunk[index : index + 2] for index in range(len(chunk) - 1))
+        else:
+            tokens.append(chunk)
+    return tokens
 
 
 class FakeLLMProvider:
@@ -49,12 +64,15 @@ class FakeLLMProvider:
         self.embedding_calls.append(list(texts))
         vectors: list[list[float]] = []
         for text in texts:
-            digest = hashlib.sha256(text.encode("utf-8")).digest()
-            vector = [
-                (digest[index % len(digest)] / 255.0) * 2 - 1
-                for index in range(self.embedding_dim)
-            ]
-            vectors.append(vector)
+            vector = [0.0] * self.embedding_dim
+            for token in _lexical_tokens(text):
+                digest = hashlib.sha256(token.encode("utf-8")).digest()
+                value = int.from_bytes(digest[:8], "big")
+                index = value % self.embedding_dim
+                sign = 1.0 if (value >> 63) & 1 else -1.0
+                vector[index] += sign
+            norm = math.sqrt(sum(item * item for item in vector)) or 1.0
+            vectors.append([item / norm for item in vector])
         return EmbeddingResult(
             vectors=vectors,
             prompt_tokens=sum(max(1, len(text) // 2) for text in texts),

@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     embedding_model: str = "qwen3.7-text-embedding-flash"
 
     # 目录
+    skills_root: Path = BASE_DIR / "skills"
     workspace_root: Path = BASE_DIR / "workspace"
     data_root: Path = BASE_DIR / "data"
     checkpoint_path: Path = BASE_DIR / "data" / "checkpoints.sqlite"
