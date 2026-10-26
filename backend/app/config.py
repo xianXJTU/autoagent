@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     test_fix_rounds: int = 5
     acceptance_rounds: int = 2
     run_timeout_seconds: int = 7200
+    run_max_tokens: int = 2_000_000
+    run_max_model_calls: int = 200
     llm_timeout_seconds: float = 120.0
     llm_max_retries: int = 3
     embedding_batch_size: int = 16
