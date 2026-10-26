@@ -13,6 +13,7 @@ from ...db.models import Document, Message, Module, Project, Run, new_id
 from ...evaluation.metrics import compute_metrics
 from ...evaluation.service import EvaluationService
 from ...services.delivery import package_project
+from ...services.retention import RetentionService
 from ..schemas import ChangeRequest, MessageIn, ProjectCreate
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -290,6 +291,36 @@ async def preview_start(project_id: str, request: Request) -> dict:
 async def preview_stop(project_id: str, request: Request) -> dict:
     services = _services(request)
     return {"stopped": services.preview.stop(project_id)}
+
+
+@router.delete("/{project_id}")
+async def delete_project(
+    project_id: str,
+    request: Request,
+    keep_traces: bool = True,
+    export: bool = False,
+) -> dict:
+    services = _services(request)
+    with services.session_factory() as session:
+        project = _project_or_404(session, project_id)
+        run = _run_for_project(session, project)
+        run_id = run.id if run else None
+    if run_id is not None:
+        task = services.tasks.get(run_id)
+        if task is not None and not task.done():
+            raise HTTPException(status_code=409, detail="项目正在生成中，请先取消")
+    services.preview.stop(project_id)
+    result = RetentionService(
+        services.session_factory,
+        services.settings.workspace_root,
+        services.settings.data_root,
+        vector_store=services.memory_store,
+    ).delete_project(project_id, keep_traces=keep_traces, export=export)
+    return {
+        "deleted": result.deleted,
+        "archive": str(result.archive_path) if result.archive_path else None,
+        "export": str(result.export_path) if result.export_path else None,
+    }
 
 
 @router.post("/{project_id}/pause")

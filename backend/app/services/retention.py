@@ -8,6 +8,7 @@ import shutil
 import stat
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -30,10 +31,12 @@ class RetentionService:
         session_factory: sessionmaker[Session],
         workspace_root: Path,
         data_root: Path,
+        vector_store: Any | None = None,
     ) -> None:
         self.session_factory = session_factory
         self.workspace_root = workspace_root
         self.data_root = data_root
+        self.vector_store = vector_store
 
     def delete_project(
         self,
@@ -56,11 +59,32 @@ class RetentionService:
             archive_path.unlink()
 
         with self.session_factory() as session:
+            memories = session.scalars(
+                select(Memory).where(Memory.project_id == project_id)
+            ).all()
+            memory_ids = [memory.id for memory in memories]
+            run_ids = [
+                row
+                for row in session.scalars(
+                    select(Run.id).where(Run.project_id == project_id)
+                ).all()
+            ]
             session.execute(
                 delete(Memory).where(Memory.project_id == project_id)
             )
             session.execute(delete(Project).where(Project.id == project_id))
             session.commit()
+
+        if self.vector_store is not None and memory_ids:
+            self.vector_store.delete(memory_ids)
+        for run_id in run_ids:
+            run_dir = self.data_root / "runs" / run_id
+            if run_dir.exists():
+                _force_remove(run_dir)
+        if not export:
+            stale_export = self.data_root / "exports" / f"{project_id}.zip"
+            if stale_export.exists():
+                stale_export.unlink()
 
         if workspace.exists():
             _force_remove(workspace)

@@ -42,14 +42,35 @@ def _count(db_session, model) -> int:
     return int(db_session.scalar(select(func.count()).select_from(model)))
 
 
+class FakeVectorStore:
+    def __init__(self) -> None:
+        self.deleted: list[str] = []
+
+    def delete(self, ids: list[str]) -> None:
+        self.deleted.extend(ids)
+
+
 def test_delete_keeps_anonymized_trace_and_exports(
     db_session, memory_session_factory, test_settings: Settings, tmp_path: Path
 ) -> None:
     project, run, manager = _setup(db_session, tmp_path)
     project_id = project.id
     run_id = run.id
+    memory = db_session.scalars(select(Memory)).one()
+    memory_id = memory.id
+    db_session.commit()
+    run_dir = test_settings.data_root / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "events.jsonl").write_text('{"type":"x"}\n', encoding="utf-8")
+    stale_export = test_settings.data_root / "exports" / f"{project_id}.zip"
+    stale_export.parent.mkdir(parents=True, exist_ok=True)
+    stale_export.write_bytes(b"old")
+    vectors = FakeVectorStore()
     service = RetentionService(
-        memory_session_factory, tmp_path / "workspace", test_settings.data_root
+        memory_session_factory,
+        tmp_path / "workspace",
+        test_settings.data_root,
+        vector_store=vectors,
     )
     result = service.delete_project(project_id, keep_traces=True, export=True)
     assert result.deleted
@@ -65,6 +86,8 @@ def test_delete_keeps_anonymized_trace_and_exports(
     assert _count(db_session, Message) == 0
     assert _count(db_session, Event) == 0
     assert _count(db_session, Memory) == 0
+    assert vectors.deleted == [memory_id]
+    assert not run_dir.exists()
     assert not (tmp_path / "workspace" / project_id).exists()
 
 

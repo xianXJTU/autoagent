@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 from httpx import ASGITransport, AsyncClient
@@ -103,6 +104,44 @@ async def test_pause_resume_cancel(api_app) -> None:
         cancelled = await client.post(f"/api/projects/{project_id}/cancel")
         assert cancelled.status_code == 200
         assert cancelled.json()["status"] == "取消"
+
+
+async def test_delete_project_and_running_guard(api_app) -> None:
+    async with _client(api_app) as client:
+        created = await client.post(
+            "/api/projects", json={"name": "待删除项目", "requirement": "任意"}
+        )
+        project_id = created.json()["project_id"]
+        run_id = created.json()["run_id"]
+        services = api_app.state.services
+        workspace = services.workspace.project_dir(project_id)
+        run_dir = services.settings.data_root / "runs" / run_id
+        assert workspace.exists()
+        assert run_dir.exists()
+
+        task = asyncio.create_task(asyncio.sleep(10))
+        services.tasks[run_id] = task
+        try:
+            blocked = await client.delete(f"/api/projects/{project_id}")
+            assert blocked.status_code == 409
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            services.tasks.pop(run_id, None)
+
+        deleted = await client.delete(
+            f"/api/projects/{project_id}?keep_traces=false"
+        )
+        assert deleted.status_code == 200
+        assert deleted.json()["deleted"]
+        assert not workspace.exists()
+        assert not run_dir.exists()
+        assert (await client.get(f"/api/projects/{project_id}")).status_code == 404
+        listing = await client.get("/api/projects")
+        assert all(item["id"] != project_id for item in listing.json())
 
 
 async def test_evaluation_endpoint(api_app) -> None:

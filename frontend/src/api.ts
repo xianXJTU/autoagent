@@ -150,3 +150,13 @@ export const getEvaluation = (projectId: string) =>
 
 export const downloadUrl = (projectId: string) =>
   `/api/projects/${projectId}/download`;
+
+export const deleteProject = (
+  projectId: string,
+  keepTraces: boolean,
+  exportSource: boolean
+) =>
+  request<{ deleted: boolean; archive: string | null; export: string | null }>(
+    `/api/projects/${projectId}?keep_traces=${keepTraces ? "true" : "false"}&export=${exportSource ? "true" : "false"}`,
+    { method: "DELETE" }
+  );
