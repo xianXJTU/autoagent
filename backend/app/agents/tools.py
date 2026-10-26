@@ -63,10 +63,16 @@ class ToolRegistry:
         skill_recall: Callable[[str], Awaitable[list[Any]]] | None = None,
         memory_query: Callable[[str], Awaitable[list[Any]]] | None = None,
         event_query: Callable[[str], Awaitable[list[Any]]] | None = None,
+        allowed_paths: set[str] | None = None,
     ) -> None:
         self.root = root.resolve()
         self.runner = runner
         self.venv_python = venv_python
+        self.allowed_paths = (
+            {item.replace("\\", "/") for item in allowed_paths}
+            if allowed_paths is not None
+            else None
+        )
         self.skill_recall = skill_recall
         self.memory_query = memory_query
         self.event_query = event_query
@@ -90,8 +96,11 @@ class ToolRegistry:
             if role != "coder":
                 raise ToolPermissionError("只有编码者可以写业务文件")
             path = kwargs["path"]
-            if path.replace("\\", "/").startswith("tests/"):
+            normalized = path.replace("\\", "/")
+            if normalized.startswith("tests/"):
                 raise ToolPermissionError("测试脚本已冻结，编码者不得修改")
+            if self.allowed_paths is not None and normalized not in self.allowed_paths:
+                raise ToolPermissionError(f"文件不在本模块归属内：{path}")
             return self._write(path, kwargs["content"])
         if tool == "write_test":
             if role != "reviewer":

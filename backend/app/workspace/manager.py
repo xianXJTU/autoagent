@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
+import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -150,7 +152,18 @@ class WorkspaceManager:
         directory = self.project_dir(project_id)
         if not directory.exists():
             return False
-        shutil.rmtree(directory, ignore_errors=True)
+
+        def _retry(function, target, _error):
+            try:
+                os.chmod(target, stat.S_IWRITE)
+                function(target)
+            except Exception:
+                pass
+
+        try:
+            shutil.rmtree(directory, onexc=_retry)
+        except TypeError:
+            shutil.rmtree(directory, onerror=_retry)
         return True
 
     def _git(self, cwd: Path, *args: str) -> str:

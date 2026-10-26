@@ -51,6 +51,17 @@ async def test_planner_and_evaluator_cannot_write_code(tmp_path: Path) -> None:
     assert path == "README.md"
 
 
+async def test_file_ownership_is_enforced(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    tools = ToolRegistry(
+        root, runner=CommandRunner(root), allowed_paths={"app/a.py"}
+    )
+    await tools.execute("coder", "write_file", path="app/a.py", content="x")
+    with pytest.raises(ToolPermissionError):
+        await tools.execute("coder", "write_file", path="app/b.py", content="x")
+
+
 async def test_role_tool_lists_are_scoped(tmp_path: Path) -> None:
     tools = _tools(tmp_path)
     coder = {spec.name for spec in tools.specs("coder")}

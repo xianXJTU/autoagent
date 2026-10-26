@@ -115,32 +115,40 @@ class CommandRunner:
     def _environment(
         self, allow_network: bool, extra: dict[str, str] | None
     ) -> dict[str, str]:
-        environment = {
-            key: os.environ[key] for key in _BASE_ENV_KEYS if key in os.environ
+        return safe_environment(self.root, allow_network, extra)
+
+
+def safe_environment(
+    project_root: Path,
+    allow_network: bool = False,
+    extra: dict[str, str] | None = None,
+) -> dict[str, str]:
+    environment = {
+        key: os.environ[key] for key in _BASE_ENV_KEYS if key in os.environ
+    }
+    environment.update(
+        {
+            "PYTHONIOENCODING": "utf-8",
+            "PYTHONUNBUFFERED": "1",
+            "PIP_NO_INPUT": "1",
+            "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+            "AUTOAGENT_PROJECT_ROOT": str(project_root),
         }
+    )
+    if not allow_network:
+        proxy = "http://127.0.0.1:9"
         environment.update(
             {
-                "PYTHONIOENCODING": "utf-8",
-                "PYTHONUNBUFFERED": "1",
-                "PIP_NO_INPUT": "1",
-                "PIP_DISABLE_PIP_VERSION_CHECK": "1",
-                "AUTOAGENT_PROJECT_ROOT": str(self.root),
+                "HTTP_PROXY": proxy,
+                "HTTPS_PROXY": proxy,
+                "ALL_PROXY": proxy,
+                "http_proxy": proxy,
+                "https_proxy": proxy,
+                "all_proxy": proxy,
+                "NO_PROXY": "",
+                "no_proxy": "",
             }
         )
-        if not allow_network:
-            proxy = "http://127.0.0.1:9"
-            environment.update(
-                {
-                    "HTTP_PROXY": proxy,
-                    "HTTPS_PROXY": proxy,
-                    "ALL_PROXY": proxy,
-                    "http_proxy": proxy,
-                    "https_proxy": proxy,
-                    "all_proxy": proxy,
-                    "NO_PROXY": "",
-                    "no_proxy": "",
-                }
-            )
-        if extra:
-            environment.update(extra)
-        return environment
+    if extra:
+        environment.update(extra)
+    return environment

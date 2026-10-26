@@ -86,7 +86,12 @@ class CodingService:
         )
 
         runner = CommandRunner(worktree)
-        tools = ToolRegistry(worktree, runner=runner, venv_python=Path(test_python))
+        tools = ToolRegistry(
+            worktree,
+            runner=runner,
+            venv_python=Path(test_python),
+            allowed_paths=set(spec.get("files") or []),
+        )
         coder = CoderAgent(
             AgentContext(
                 project_id=project_id,
