@@ -15,7 +15,11 @@ class PlannerAgent(BaseAgent):
         content = (
             f"这是第 {round_no} 轮提问，最多 {max_rounds} 轮。\n"
             f"已知对话与决定：\n{history_text}\n"
-            "请提出 3 到 6 个当前最需要确认的问题，每个问题附推荐答案。"
+            "请提出 3 到 6 个当前最需要确认的问题。要求：\n"
+            "1. 用普通人能听懂的中文提问，不要出现框架名、数据库术语、接口协议等技术词；\n"
+            "2. 每个问题都给出你推荐的默认做法，写在 recommendation 字段；\n"
+            "3. 每个问题都用一句话说明为什么推荐这样做，写在 reason 字段；\n"
+            "4. 如果某个信息可以自己查或可以合理默认，就不要拿来问用户。"
         )
         result, _ = await self._structured(
             AlignmentQuestions, content, purpose="需求对齐"

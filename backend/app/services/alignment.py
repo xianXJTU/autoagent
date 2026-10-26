@@ -36,7 +36,9 @@ def format_questions(questions: AlignmentQuestions, round_no: int) -> str:
     for index, question in enumerate(questions.questions, start=1):
         lines.append(f"{index}. {question.question}")
         if question.recommendation:
-            lines.append(f"   建议：{question.recommendation}")
+            lines.append(f"   推荐做法：{question.recommendation}")
+        if question.reason:
+            lines.append(f"   推荐理由：{question.reason}")
         if question.options:
             lines.append("   选项：" + " / ".join(question.options))
     return "\n".join(lines)

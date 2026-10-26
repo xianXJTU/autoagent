@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class Question(BaseModel):
     question: str
     recommendation: str = ""
+    reason: str = ""
     options: list[str] = Field(default_factory=list)
 
 
