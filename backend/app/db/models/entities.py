@@ -231,6 +231,7 @@ class SkillUsage(Base):
 
 class TestResult(Base):
     __tablename__ = "tests"
+    __test__ = False
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     run_id: Mapped[str] = mapped_column(
