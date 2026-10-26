@@ -68,6 +68,15 @@ class WorkspaceManager:
         )
         return worktree
 
+    def commit_main(self, project_id: str, message: str) -> str | None:
+        repo = self.repo_path(project_id)
+        status = self._git(repo, "status", "--porcelain")
+        if not status.strip():
+            return None
+        self._git(repo, "add", "-A")
+        self._git(repo, "commit", "-m", message)
+        return self._git(repo, "rev-parse", "HEAD").strip()
+
     def commit_module(
         self, project_id: str, module_id: str, message: str
     ) -> str | None:
