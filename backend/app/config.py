@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 16
 
     # 上下文压缩
+    model_context_window: int = 1_048_576
     compression_ratio: float = 0.6
     compression_absolute_tokens: int = 200_000
     compression_min_tokens: int = 50_000
