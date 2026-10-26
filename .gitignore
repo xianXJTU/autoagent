@@ -11,10 +11,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# 生成物与运行数据
-workspace/
-data/
-runs/
+# 生成物与运行数据（仅根目录，避免误伤同名源码目录）
+/workspace/
+/data/
+/runs/
 
 # 前端
 node_modules/
