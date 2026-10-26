@@ -5,11 +5,24 @@ export interface ProjectSummary {
   updated_at: string;
 }
 
+export interface Question {
+  question: string;
+  recommendation?: string;
+  reason?: string;
+  options?: string[];
+}
+
 export interface Message {
   id: string;
   role: string;
   agent_id: string | null;
   content: string;
+  meta?: {
+    questions?: {
+      questions?: Question[];
+    };
+    [key: string]: unknown;
+  };
   created_at: string;
 }
 

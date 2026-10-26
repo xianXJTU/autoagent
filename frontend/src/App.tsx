@@ -22,6 +22,7 @@ export default function App() {
   const [diff, setDiff] = useState("");
   const [evaluation, setEvaluation] = useState<api.Evaluation | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [answers, setAnswers] = useState<Record<number, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteTraces, setDeleteTraces] = useState(false);
   const [deleteExport, setDeleteExport] = useState(false);
@@ -81,6 +82,22 @@ export default function App() {
     return () => source.close();
   }, [detail?.run_id, selected, refreshDetail]);
 
+  const lastMessage = detail?.messages[detail.messages.length - 1];
+  const pendingQuestions = questionsFromMessage(lastMessage);
+  const lastMessageId = lastMessage?.id;
+
+  useEffect(() => {
+    if (!pendingQuestions.length) {
+      setAnswers({});
+      return;
+    }
+    const next: Record<number, string> = {};
+    pendingQuestions.forEach((question, index) => {
+      next[index] = question.recommendation ?? "";
+    });
+    setAnswers(next);
+  }, [lastMessageId]);
+
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
     setError("");
@@ -118,8 +135,30 @@ export default function App() {
   const send = () =>
     run(async () => {
       if (!selected || !text.trim()) return;
-      await api.sendMessage(selected, text.trim());
+      const result = await api.sendMessage(selected, text.trim());
+      if ((result as { action?: string }).action === "review") setTab("doc");
       setText("");
+      await refreshDetail(selected);
+    });
+
+  const submitAnswers = () =>
+    run(async () => {
+      if (!selected || !pendingQuestions.length) return;
+      const entries = pendingQuestions.map((question, index) => ({
+        question: question.question,
+        answer: (answers[index] ?? "").trim()
+      }));
+      if (entries.some((entry) => !entry.answer)) {
+        setError("请为每个问题填写回答，或点“采用推荐”。");
+        return;
+      }
+      const body =
+        "本轮回答：\n" +
+        entries
+          .map((entry, index) => `${index + 1}. ${entry.question}\n回答：${entry.answer}`)
+          .join("\n\n");
+      const result = await api.sendMessage(selected, body);
+      if ((result as { action?: string }).action === "review") setTab("doc");
       await refreshDetail(selected);
     });
 
@@ -335,7 +374,7 @@ export default function App() {
             <div className="workbench">
               <section className="conversation">
                 <div className="messages">
-                  {detail.messages.map((message) => (
+                  {detail.messages.map((message, index) => (
                     <div
                       key={message.id}
                       className={`message ${message.role === "user" ? "user" : "agent"}`}
@@ -347,7 +386,31 @@ export default function App() {
                         <div className="message-meta">
                           {message.role === "user" ? "你" : message.agent_id ?? "autoagent"}
                         </div>
-                        <div className="message-content">{message.content}</div>
+                        {index === detail.messages.length - 1 &&
+                        message.role !== "user" &&
+                        pendingQuestions.length > 0 ? (
+                          <QuestionBatch
+                            questions={pendingQuestions}
+                            answers={answers}
+                            busy={busy}
+                            onChange={(questionIndex, value) =>
+                              setAnswers((current) => ({
+                                ...current,
+                                [questionIndex]: value
+                              }))
+                            }
+                            onUseRecommendation={(questionIndex) =>
+                              setAnswers((current) => ({
+                                ...current,
+                                [questionIndex]:
+                                  pendingQuestions[questionIndex].recommendation ?? ""
+                              }))
+                            }
+                            onSubmit={submitAnswers}
+                          />
+                        ) : (
+                          <div className="message-content">{message.content}</div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -545,6 +608,68 @@ export default function App() {
           onConfirm={confirmDelete}
         />
       )}
+    </div>
+  );
+}
+
+function questionsFromMessage(message: api.Message | undefined): api.Question[] {
+  if (!message || message.role === "user") return [];
+  const list = message.meta?.questions?.questions;
+  return Array.isArray(list) ? list : [];
+}
+
+function QuestionBatch({
+  questions,
+  answers,
+  busy,
+  onChange,
+  onUseRecommendation,
+  onSubmit
+}: {
+  questions: api.Question[];
+  answers: Record<number, string>;
+  busy: boolean;
+  onChange: (index: number, value: string) => void;
+  onUseRecommendation: (index: number) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="question-batch">
+      <div className="question-batch-head">请逐题确认 · 共 {questions.length} 个问题</div>
+      {questions.map((question, index) => (
+        <div className="question-card" key={`${index}-${question.question}`}>
+          <div className="question-head">
+            <span className="question-index">{index + 1}</span>
+            <span>{question.question}</span>
+          </div>
+          {question.reason && <p className="question-reason">推荐理由：{question.reason}</p>}
+          <div className="question-recommend">
+            <span className="question-label">推荐做法</span>
+            <span>{question.recommendation || "暂无推荐，请自行填写"}</span>
+            {question.recommendation && (
+              <button
+                className="btn ghost small"
+                disabled={busy}
+                onClick={() => onUseRecommendation(index)}
+              >
+                采用推荐
+              </button>
+            )}
+          </div>
+          <textarea
+            className="question-input"
+            value={answers[index] ?? ""}
+            onChange={(event) => onChange(index, event.target.value)}
+            placeholder="可以采用推荐做法，也可以在这里写你自己的答案"
+          />
+        </div>
+      ))}
+      <div className="question-actions">
+        <span className="hint">每题都可以单独修改；也可以直接说“够了”。</span>
+        <button className="btn primary" disabled={busy} onClick={onSubmit}>
+          提交本轮回答
+        </button>
+      </div>
     </div>
   );
 }

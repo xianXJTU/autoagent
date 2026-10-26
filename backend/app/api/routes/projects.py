@@ -127,6 +127,7 @@ async def project_detail(project_id: str, request: Request) -> dict:
                     "role": item.role,
                     "agent_id": item.agent_id,
                     "content": item.content,
+                    "meta": item.meta or {},
                     "created_at": item.created_at.isoformat(),
                 }
                 for item in messages

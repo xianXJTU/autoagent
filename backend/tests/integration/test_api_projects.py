@@ -51,6 +51,14 @@ async def test_project_crud_and_alignment(api_app) -> None:
         assert aligned.status_code == 200
         assert aligned.json()["questions"]["questions"][0]["question"] == "给谁用？"
 
+        detailed = (await client.get(f"/api/projects/{project_id}")).json()
+        planner_message = next(
+            message for message in detailed["messages"] if message["role"] == "planner"
+        )
+        question = planner_message["meta"]["questions"]["questions"][0]
+        assert question["recommendation"] == "只给你自己"
+        assert question["reason"] == ""
+
         provider.responses.append({"content": "# 需求\n记账工具"})
         answered = await client.post(
             f"/api/projects/{project_id}/messages", json={"text": "够了"}
