@@ -40,3 +40,7 @@ async def test_structured_repairs_bad_output(memory_session_factory) -> None:
     assert result.name == "demo"
     assert result.count == 2
     assert len(provider.calls) == 2
+    assert any(
+        "json" in message["content"].lower()
+        for message in provider.calls[0]["messages"]
+    )

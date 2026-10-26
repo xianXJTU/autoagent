@@ -60,7 +60,16 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || response.statusText);
+    let message = text || response.statusText || `HTTP ${response.status}`;
+    try {
+      const data = JSON.parse(text) as { detail?: unknown };
+      if (typeof data.detail === "string" && data.detail) {
+        message = data.detail;
+      }
+    } catch {
+      // 保留原始文本
+    }
+    throw new Error(message);
   }
   return (await response.json()) as T;
 }

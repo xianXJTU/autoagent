@@ -8,6 +8,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from .base import ensure_json_hint
 from .service import ModelService
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
@@ -43,7 +44,7 @@ async def chat_structured(
     purpose: str = "",
     max_repair: int = 2,
 ) -> tuple[SchemaT, Any]:
-    conversation = list(messages)
+    conversation = ensure_json_hint(list(messages))
     last_error: Exception | None = None
     for _ in range(max_repair + 1):
         result = await service.chat(

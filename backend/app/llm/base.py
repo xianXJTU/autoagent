@@ -31,6 +31,19 @@ class EmbeddingResult(BaseModel):
     model: str = ""
 
 
+def ensure_json_hint(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """DeepSeek 的 json_object 模式要求提示词里出现 json 字样。"""
+    if any("json" in str(message.get("content", "")).lower() for message in messages):
+        return list(messages)
+    return [
+        *messages,
+        {
+            "role": "system",
+            "content": "你必须只输出一个合法的 JSON 对象，不要输出任何 JSON 之外的文字。",
+        },
+    ]
+
+
 class ChatProvider(Protocol):
     model: str
 

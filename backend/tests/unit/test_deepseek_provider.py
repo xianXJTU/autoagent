@@ -19,6 +19,7 @@ class _Completions:
 
     async def create(self, **kwargs):
         self.calls += 1
+        self.last_kwargs = kwargs
         outcome = self.outcomes.pop(0)
         if isinstance(outcome, Exception):
             raise outcome
@@ -64,6 +65,17 @@ async def test_parses_tool_calls() -> None:
     result = await provider.chat([{"role": "user", "content": "hi"}])
     assert result.tool_calls[0].name == "write_file"
     assert "a.py" in result.tool_calls[0].arguments
+
+
+async def test_json_mode_adds_json_hint() -> None:
+    client = _client([_response('{"a": 1}')])
+    provider = DeepSeekProvider("k", "http://x", "deepseek-flash", client=client)
+    await provider.chat(
+        [{"role": "user", "content": "请给出一个对象"}],
+        response_format={"type": "json_object"},
+    )
+    messages = client.chat.completions.last_kwargs["messages"]
+    assert any("json" in message["content"].lower() for message in messages)
 
 
 async def test_gives_up_after_retries() -> None:

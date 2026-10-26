@@ -139,3 +139,14 @@
 - 影响：测试文件不是 TypeScript，其余不变。
 
 ---
+
+### Q-012 深寻 JSON 模式要求提示词包含 json 字样
+
+- 时间：2026-10-26
+- 阶段：真实环境首次运行
+- 问题：需求对齐调用返回 500。日志显示深寻接口 400：`Prompt must contain the word 'json' in some form to use 'response_format' of type 'json_object'`。结构化输出调用没有在提示词里写 JSON，导致接口直接拒绝。
+- 依据：PLAN M4 的结构化输出方案；真实模型冒烟只验证了普通对话，未覆盖 JSON 模式。
+- 方案：在结构化调用与深寻客户端两处统一补上“只输出 JSON”的指令；同时增加全局未处理异常处理，前端解析错误详情，避免只看到 Internal Server Error。
+- 影响：所有结构化调用恢复正常；错误信息可读。已用真实接口复测对齐步骤。
+
+---

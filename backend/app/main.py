@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api.routes.projects import router as projects_router
@@ -14,6 +16,7 @@ from .api.routes.runs import router as runs_router
 from .config import Settings, get_settings
 from .events.router import router as events_router
 from .logging_config import configure_logging
+from .redaction import redact_text
 from .services.container import ServiceContainer
 
 
@@ -51,6 +54,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(events_router)
     app.include_router(projects_router)
     app.include_router(runs_router)
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception(_: Request, exc: Exception) -> JSONResponse:
+        logging.getLogger("autoagent.api").exception("未处理异常")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": redact_text(f"{type(exc).__name__}: {exc}")[:2000]
+            },
+        )
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:

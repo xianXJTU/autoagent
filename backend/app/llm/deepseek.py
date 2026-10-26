@@ -7,7 +7,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from .base import ChatResult, ToolCallOut
+from .base import ChatResult, ToolCallOut, ensure_json_hint
 
 
 def _is_retryable(exc: Exception) -> bool:
@@ -56,6 +56,8 @@ class DeepSeekProvider:
             payload["tool_choice"] = "auto"
         if response_format:
             payload["response_format"] = response_format
+            if response_format.get("type") == "json_object":
+                payload["messages"] = ensure_json_hint(messages)
         if max_tokens:
             payload["max_tokens"] = max_tokens
 
