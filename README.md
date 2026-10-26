@@ -71,6 +71,24 @@ cd ..
 
 打开 http://127.0.0.1:8010 。
 
+如果 8010 已被占用，可以换一个端口：
+
+```powershell
+.\scripts\run.ps1 -Port 8011
+```
+
+然后打开 http://127.0.0.1:8011 。确认旧实例是否占用端口：
+
+```powershell
+Get-NetTCPConnection -LocalPort 8010 -State Listen | Select-Object LocalAddress,LocalPort,OwningProcess
+```
+
+需要停止旧实例时：
+
+```powershell
+Get-NetTCPConnection -LocalPort 8010 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+```
+
 ## 测试
 
 ```powershell
